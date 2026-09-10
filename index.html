@@ -745,6 +745,7 @@
       scrollWheelZoom: false,
       zoomSnap: 0.25,
     });
+    depLeafletMap.setView([4.5, -74], 5);
     depGeoLayer = L.geoJSON(depGeoJSON, {
       style: (f) => styleForDepFeature(f, depSelect.value),
       onEachFeature: (feature, layer) => {
@@ -858,6 +859,7 @@
       zoomSnap: 0.25,
       renderer: L.canvas(),
     });
+    munLeafletMap.setView([4.5, -74], 5);
     munGeoLayer = L.geoJSON(munGeoJSON, {
       style: (f) => styleForMunFeature(f, munKey(munDepSelect.value, munSelect.value)),
       onEachFeature: (feature, layer) => {
