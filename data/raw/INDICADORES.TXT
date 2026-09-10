@@ -1,0 +1,6 @@
+1Mesas Nacional                                                                                      0360
+3Mesas Exterior 700                                                                                  0700
+4Mesas Puesto Censo 500                                                                              0500
+5Mesas Puesto Censo 800                                                                              0800
+8Mesas Puesto Censo 1200                                                                             1200
+9Mesas Exteri LunSa 9999                                                                             9999
