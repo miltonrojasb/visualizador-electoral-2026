@@ -760,7 +760,7 @@
         layer.on('mouseleave', hideTooltip);
       },
     }).addTo(depLeafletMap);
-    depLeafletMap.fitBounds(depGeoLayer.getBounds(), { padding: [8, 8] });
+    if (document.getElementById('dep-map').offsetWidth > 0) { depLeafletMap.fitBounds(depGeoLayer.getBounds(), { padding: [8, 8] }); depMapFitted = true; }
   }
 
   function updateDepMapSelection(cod) {
@@ -880,7 +880,7 @@
         layer.on('mouseleave', hideTooltip);
       },
     }).addTo(munLeafletMap);
-    munLeafletMap.fitBounds(munGeoLayer.getBounds(), { padding: [8, 8] });
+    if (document.getElementById('mun-map').offsetWidth > 0) { munLeafletMap.fitBounds(munGeoLayer.getBounds(), { padding: [8, 8] }); munMapFitted = true; }
   }
 
   function updateMunMapSelection(cd, cm) {
@@ -903,8 +903,9 @@
 
   function zoomMunMapToDep(cd) {
     if (!munLeafletMap) return;
+    if (document.getElementById('mun-map').offsetWidth === 0) return;
     const layer = depLayerByCod[cd];
-    if (layer) munLeafletMap.fitBounds(layer.getBounds(), { padding: [16, 16], maxZoom: 10 });
+    if (layer) { munLeafletMap.fitBounds(layer.getBounds(), { padding: [16, 16], maxZoom: 10 }); munMapFitted = true; }
   }
 
   function redrawMunMapColors() {
