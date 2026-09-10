@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visualizador Electoral — Presidenciales Colombia 2026</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page-plane:     #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --otros:          #b9b7ad;
+    --especial:       #d8d6cc;
+
+    --series-1: #2a78d6; /* azul */
+    --series-2: #eb6834; /* naranja */
+    --series-3: #1baf7a; /* aqua */
+    --series-4: #eda100; /* amarillo */
+    --series-5: #e87ba4; /* magenta */
+    --series-6: #008300; /* verde */
+    --series-7: #4a3aa7; /* violeta */
+    --series-8: #e34948; /* rojo */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page-plane:     #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --gridline:       #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --otros:          #5a5952;
+      --especial:       #3a3a37;
+
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #199e70;
+      --series-4: #c98500;
+      --series-5: #d55181;
+      --series-6: #008300;
+      --series-7: #9085e9;
+      --series-8: #e66767;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1:      #1a1a19;
+    --page-plane:     #0d0d0d;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --gridline:       #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+    --otros:          #5a5952;
+    --especial:       #3a3a37;
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+    --series-7: #9085e9;
+    --series-8: #e66767;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page-plane);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 0 16px 48px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+
+  header {
+    padding: 28px 0 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 20px;
+  }
+  h1 { font-size: 1.35rem; margin: 0 0 4px; font-weight: 700; }
+  .subtitle { color: var(--text-secondary); font-size: 0.9rem; margin: 0; }
+  .meta { color: var(--text-muted); font-size: 0.78rem; margin-top: 6px; }
+
+  #theme-toggle {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+
+  nav.tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  nav.tabs button {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+    font-weight: 600;
+    padding: 10px 16px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    font-family: inherit;
+  }
+  nav.tabs button.active {
+    color: var(--text-primary);
+    border-bottom-color: var(--series-1);
+  }
+  nav.tabs button:hover:not(.active) { color: var(--text-primary); }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 18px;
+  }
+  select, input[type="search"] {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 0.88rem;
+    font-family: inherit;
+  }
+  select { min-width: 200px; }
+  input[type="search"] { min-width: 220px; }
+
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    margin-bottom: 22px;
+  }
+  .stat-tile {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .stat-tile .label { font-size: 0.76rem; color: var(--text-secondary); margin-bottom: 4px; }
+  .stat-tile .value { font-size: 1.5rem; font-weight: 700; line-height: 1.25; }
+  .stat-tile .value.small { font-size: 1.05rem; }
+
+  .chart-card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px 10px;
+    margin-bottom: 22px;
+  }
+  .chart-card h3 { margin: 0 0 4px; font-size: 0.95rem; }
+  .chart-sub { color: var(--text-muted); font-size: 0.78rem; margin: 0 0 14px; }
+
+  .bar-row {
+    display: grid;
+    grid-template-columns: 190px 1fr 76px;
+    align-items: center;
+    gap: 10px;
+    height: 30px;
+    position: relative;
+  }
+  .bar-name {
+    font-size: 0.82rem;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .bar-track {
+    position: relative;
+    height: 24px;
+    background: transparent;
+  }
+  .bar-fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    border-radius: 4px;
+    min-width: 3px;
+    cursor: pointer;
+  }
+  .bar-value {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .bar-grid-line {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 1px;
+    background: var(--gridline);
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+    margin: 12px 0 4px;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+  thead th {
+    text-align: left;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  thead th:hover { color: var(--text-primary); }
+  tbody td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--gridline);
+  }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .table-wrap { overflow-x: auto; background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 4px 12px; }
+
+  .tooltip {
+    position: fixed;
+    background: var(--text-primary);
+    color: var(--surface-1);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    pointer-events: none;
+    z-index: 50;
+    opacity: 0;
+    transition: opacity 0.1s;
+    white-space: nowrap;
+  }
+  .tooltip.show { opacity: 1; }
+
+  footer {
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    line-height: 1.6;
+  }
+  footer a { color: var(--text-secondary); }
+
+  .empty-state {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    padding: 24px 0;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>Visualizador Electoral — Presidenciales Colombia 2026</h1>
+      <p class="subtitle">Observatorio de la Calidad de la Democracia Subnacional · Universidad de Medellín</p>
+      <p class="meta" id="meta-generado"></p>
+    </div>
+    <button id="theme-toggle" type="button">🌓 Tema</button>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="nacional">Nacional</button>
+    <button class="tab-btn" data-tab="departamental">Departamental</button>
+    <button class="tab-btn" data-tab="municipal">Municipal</button>
+  </nav>
+
+  <!-- ===================== NACIONAL ===================== -->
+  <section class="panel active" id="panel-nacional">
+    <div class="stat-row" id="nacional-stats"></div>
+    <div class="chart-card">
+      <h3>Resultados nacionales por candidato</h3>
+      <p class="chart-sub">Votos totales sumados en los 34 departamentos/circunscripciones del país, incluido el exterior.</p>
+      <div id="nacional-chart"></div>
+      <div class="legend">
+        <div class="legend-item"><span class="swatch" style="background:var(--otros)"></span> Otros candidatos (fuera de los 8 más votados)</div>
+        <div class="legend-item"><span class="swatch" style="background:var(--especial)"></span> Votos especiales (no marcado / nulo / blanco)</div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="nacional-table">
+        <thead>
+          <tr>
+            <th data-key="nombre">Candidato</th>
+            <th>Partido / Movimiento</th>
+            <th class="num" data-key="votos">Votos</th>
+            <th class="num" data-key="pct">% </th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===================== DEPARTAMENTAL ===================== -->
+  <section class="panel" id="panel-departamental">
+    <div class="controls">
+      <select id="dep-select"></select>
+    </div>
+    <div class="stat-row" id="dep-stats"></div>
+    <div class="chart-card">
+      <h3 id="dep-chart-title">Resultados por candidato</h3>
+      <p class="chart-sub">Votos en el departamento seleccionado.</p>
+      <div id="dep-chart"></div>
+    </div>
+    <div class="table-wrap">
+      <table id="dep-table">
+        <thead>
+          <tr>
+            <th data-key="nombre">Candidato</th>
+            <th>Partido / Movimiento</th>
+            <th class="num" data-key="votos">Votos</th>
+            <th class="num" data-key="pct">%</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===================== MUNICIPAL ===================== -->
+  <section class="panel" id="panel-municipal">
+    <div class="controls">
+      <select id="mun-dep-select"></select>
+      <select id="mun-select"></select>
+      <input type="search" id="mun-search" placeholder="Buscar municipio en todo el país…">
+    </div>
+    <div id="mun-search-results" class="table-wrap" style="display:none; margin-bottom: 18px;"></div>
+    <div id="mun-detail">
+      <div class="stat-row" id="mun-stats"></div>
+      <div class="chart-card">
+        <h3 id="mun-chart-title">Resultados por candidato</h3>
+        <p class="chart-sub">Votos en el municipio seleccionado.</p>
+        <div id="mun-chart"></div>
+      </div>
+      <div class="table-wrap">
+        <table id="mun-table">
+          <thead>
+            <tr>
+              <th data-key="nombre">Candidato</th>
+              <th>Partido / Movimiento</th>
+              <th class="num" data-key="votos">Votos</th>
+              <th class="num" data-key="pct">%</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>
+      Fuente: Registraduría Nacional del Estado Civil, escrutinios de mesa, Elecciones Presidenciales Colombia 2026.
+      Datos agregados desde el nivel de mesa a los niveles nacional, departamental y municipal.
+      Los códigos <em>996 (no marcados)</em>, <em>997 (nulos)</em> y <em>998 (blanco)</em> se muestran como votos especiales, no como candidatos.
+    </p>
+    <p>
+      Cómo actualizar estos datos: reemplace los archivos CSV de escrutinio en <code>data/raw/escrutinio/</code>,
+      corra <code>scripts/02_download_and_aggregate.py</code> y luego <code>scripts/03_build_json.py</code>;
+      esto regenera <code>site/data/resultados.json</code>, que es el único archivo que consume esta página.
+    </p>
+  </footer>
+
+</div>
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+(async function () {
+  const seriesColors = [
+    'var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)',
+    'var(--series-5)', 'var(--series-6)', 'var(--series-7)', 'var(--series-8)'
+  ];
+
+  // ---------- Tema ----------
+  const themeBtn = document.getElementById('theme-toggle');
+  function applyTheme(t) {
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    else document.documentElement.removeAttribute('data-theme');
+  }
+  let savedTheme = null;
+  try { savedTheme = localStorage.getItem('electoral2026-theme'); } catch (e) {}
+  applyTheme(savedTheme);
+  themeBtn.addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme');
+    const next = current === 'dark' ? 'light' : (current === 'light' ? null : 'dark');
+    applyTheme(next);
+    try {
+      if (next) localStorage.setItem('electoral2026-theme', next);
+      else localStorage.removeItem('electoral2026-theme');
+    } catch (e) {}
+  });
+
+  // ---------- Tabs ----------
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ---------- Tooltip ----------
+  const tooltip = document.getElementById('tooltip');
+  function showTooltip(evt, html) {
+    tooltip.innerHTML = html;
+    tooltip.classList.add('show');
+    moveTooltip(evt);
+  }
+  function moveTooltip(evt) {
+    tooltip.style.left = (evt.clientX + 14) + 'px';
+    tooltip.style.top = (evt.clientY + 14) + 'px';
+  }
+  function hideTooltip() { tooltip.classList.remove('show'); }
+
+  // ---------- Carga de datos ----------
+  const resp = await fetch('data/resultados.json');
+  const data = await resp.json();
+
+  document.getElementById('meta-generado').textContent =
+    'Datos generados: ' + new Date(data.generado).toLocaleString('es-CO');
+
+  const candidatos = data.candidatos; // { cod: {nombre, partido, especial, slot} }
+
+  function fmtNum(n) { return n.toLocaleString('es-CO'); }
+  function fmtPct(n) { return n.toFixed(2) + '%'; }
+
+  function colorFor(cod) {
+    const meta = candidatos[cod];
+    if (!meta) return 'var(--otros)';
+    if (meta.especial) return 'var(--especial)';
+    if (meta.slot !== null && meta.slot !== undefined) return seriesColors[meta.slot];
+    return 'var(--otros)';
+  }
+
+  // Construye filas ordenadas {cod, nombre, partido, votos, pct, especial, slot}
+  function buildRows(votosObj, total) {
+    const rows = Object.keys(votosObj).map(cod => {
+      const meta = candidatos[cod] || { nombre: cod, partido: '', especial: false, slot: null };
+      return {
+        cod,
+        nombre: meta.nombre,
+        partido: meta.partido,
+        especial: meta.especial,
+        slot: meta.slot,
+        votos: votosObj[cod],
+        pct: total > 0 ? (votosObj[cod] / total * 100) : 0
+      };
+    });
+    rows.sort((a, b) => b.votos - a.votos);
+    return rows;
+  }
+
+  // Renderiza gráfico de barras horizontal
+  function renderChart(containerId, rows, maxRows) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+    const visible = rows.slice(0, maxRows || rows.length);
+    const max = Math.max(...visible.map(r => r.votos), 1);
+
+    visible.forEach(r => {
+      const row = document.createElement('div');
+      row.className = 'bar-row';
+
+      const name = document.createElement('div');
+      name.className = 'bar-name';
+      name.textContent = r.especial ? r.nombre : r.nombre;
+      name.title = r.nombre + (r.partido ? ' — ' + r.partido : '');
+
+      const track = document.createElement('div');
+      track.className = 'bar-track';
+      const fill = document.createElement('div');
+      fill.className = 'bar-fill';
+      const pctWidth = Math.max((r.votos / max) * 100, 0.5);
+      fill.style.width = pctWidth + '%';
+      fill.style.background = colorFor(r.cod);
+      fill.style.height = '24px';
+      fill.addEventListener('mousemove', (e) => {
+        showTooltip(e, `<strong>${r.nombre}</strong><br>${fmtNum(r.votos)} votos (${fmtPct(r.pct)})`);
+      });
+      fill.addEventListener('mouseleave', hideTooltip);
+      track.appendChild(fill);
+
+      const val = document.createElement('div');
+      val.className = 'bar-value';
+      val.textContent = fmtNum(r.votos);
+
+      row.appendChild(name);
+      row.appendChild(track);
+      row.appendChild(val);
+      container.appendChild(row);
+    });
+  }
+
+  // Renderiza tabla ordenable
+  function renderTable(tableId, rows, sortState) {
+    const table = document.getElementById(tableId);
+    const tbody = table.querySelector('tbody');
+    tbody.innerHTML = '';
+    rows.forEach(r => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><span class="swatch" style="background:${colorFor(r.cod)}; display:inline-block; margin-right:6px;"></span>${r.nombre}</td>
+        <td>${r.partido || '—'}</td>
+        <td class="num">${fmtNum(r.votos)}</td>
+        <td class="num">${fmtPct(r.pct)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function wireSortableTable(tableId, rows, onSort) {
+    const table = document.getElementById(tableId);
+    table.querySelectorAll('thead th[data-key]').forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.key;
+        const dir = th.dataset.dir === 'asc' ? 'desc' : 'asc';
+        table.querySelectorAll('thead th').forEach(x => x.removeAttribute('data-dir'));
+        th.dataset.dir = dir;
+        const sorted = rows.slice().sort((a, b) => {
+          let va = a[key], vb = b[key];
+          if (typeof va === 'string') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
+          if (va < vb) return dir === 'asc' ? -1 : 1;
+          if (va > vb) return dir === 'asc' ? 1 : -1;
+          return 0;
+        });
+        onSort(sorted);
+      });
+    });
+  }
+
+  function renderStats(containerId, total, rows) {
+    const container = document.getElementById(containerId);
+    const ganador = rows[0];
+    container.innerHTML = '';
+    const tiles = [
+      { label: 'Total de votos', value: fmtNum(total), small: false },
+      { label: 'Candidato más votado', value: ganador ? ganador.nombre : '—', small: true },
+      { label: 'Votación del más votado', value: ganador ? fmtPct(ganador.pct) : '—', small: false },
+    ];
+    tiles.forEach(t => {
+      const div = document.createElement('div');
+      div.className = 'stat-tile';
+      const cls = t.small ? 'value small' : 'value';
+      div.innerHTML = `<div class="label">${t.label}</div><div class="${cls}">${t.value}</div>`;
+      container.appendChild(div);
+    });
+  }
+
+  // ================= NACIONAL =================
+  (function initNacional() {
+    const rows = buildRows(data.nacional.votos, data.nacional.total);
+    renderStats('nacional-stats', data.nacional.total, rows);
+    renderChart('nacional-chart', rows);
+    renderTable('nacional-table', rows);
+    wireSortableTable('nacional-table', rows, (sorted) => renderTable('nacional-table', sorted));
+  })();
+
+  // ================= DEPARTAMENTAL =================
+  const depSelect = document.getElementById('dep-select');
+  const depCodes = Object.keys(data.departamental).sort((a, b) =>
+    data.departamental[a].nombre.localeCompare(data.departamental[b].nombre, 'es')
+  );
+  depCodes.forEach(cd => {
+    const opt = document.createElement('option');
+    opt.value = cd;
+    opt.textContent = data.departamental[cd].nombre;
+    depSelect.appendChild(opt);
+  });
+
+  function renderDepartamento(cd) {
+    const dep = data.departamental[cd];
+    if (!dep) return;
+    const rows = buildRows(dep.votos, dep.total);
+    document.getElementById('dep-chart-title').textContent = 'Resultados en ' + dep.nombre;
+    renderStats('dep-stats', dep.total, rows);
+    renderChart('dep-chart', rows);
+    renderTable('dep-table', rows);
+    wireSortableTable('dep-table', rows, (sorted) => renderTable('dep-table', sorted));
+  }
+  depSelect.addEventListener('change', () => renderDepartamento(depSelect.value));
+  if (depCodes.length) { depSelect.value = depCodes[0]; renderDepartamento(depCodes[0]); }
+
+  // ================= MUNICIPAL =================
+  const munDepSelect = document.getElementById('mun-dep-select');
+  const munSelect = document.getElementById('mun-select');
+  const munSearch = document.getElementById('mun-search');
+  const munSearchResults = document.getElementById('mun-search-results');
+  const munDetail = document.getElementById('mun-detail');
+
+  depCodes.forEach(cd => {
+    const opt = document.createElement('option');
+    opt.value = cd;
+    opt.textContent = data.departamental[cd].nombre;
+    munDepSelect.appendChild(opt);
+  });
+
+  function populateMunicipios(cd) {
+    munSelect.innerHTML = '';
+    const muns = data.municipal[cd] || {};
+    const codes = Object.keys(muns).sort((a, b) => muns[a].nombre.localeCompare(muns[b].nombre, 'es'));
+    codes.forEach(cm => {
+      const opt = document.createElement('option');
+      opt.value = cm;
+      opt.textContent = muns[cm].nombre;
+      munSelect.appendChild(opt);
+    });
+    return codes;
+  }
+
+  function renderMunicipio(cd, cm) {
+    const mun = (data.municipal[cd] || {})[cm];
+    if (!mun) return;
+    munDetail.style.display = 'block';
+    munSearchResults.style.display = 'none';
+    const rows = buildRows(mun.votos, mun.total);
+    document.getElementById('mun-chart-title').textContent =
+      'Resultados en ' + mun.nombre + ' (' + data.departamental[cd].nombre + ')';
+    renderStats('mun-stats', mun.total, rows);
+    renderChart('mun-chart', rows);
+    renderTable('mun-table', rows);
+    wireSortableTable('mun-table', rows, (sorted) => renderTable('mun-table', sorted));
+  }
+
+  munDepSelect.addEventListener('change', () => {
+    const codes = populateMunicipios(munDepSelect.value);
+    if (codes.length) { munSelect.value = codes[0]; renderMunicipio(munDepSelect.value, codes[0]); }
+  });
+  munSelect.addEventListener('change', () => renderMunicipio(munDepSelect.value, munSelect.value));
+
+  if (depCodes.length) {
+    munDepSelect.value = depCodes[0];
+    const codes = populateMunicipios(depCodes[0]);
+    if (codes.length) { munSelect.value = codes[0]; renderMunicipio(depCodes[0], codes[0]); }
+  }
+
+  // Búsqueda global de municipios
+  let searchTimer = null;
+  munSearch.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      const q = munSearch.value.trim().toLowerCase();
+      if (q.length < 2) {
+        munSearchResults.style.display = 'none';
+        munDetail.style.display = 'block';
+        return;
+      }
+      const matches = [];
+      for (const cd of Object.keys(data.municipal)) {
+        for (const cm of Object.keys(data.municipal[cd])) {
+          const nombre = data.municipal[cd][cm].nombre;
+          if (nombre.toLowerCase().includes(q)) {
+            matches.push({ cd, cm, nombre, depNombre: data.departamental[cd].nombre });
+          }
+        }
+      }
+      matches.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+      if (!matches.length) {
+        munSearchResults.innerHTML = '<div class="empty-state">Sin resultados para "' + munSearch.value + '"</div>';
+      } else {
+        const rowsHtml = matches.slice(0, 50).map(m =>
+          `<tr data-cd="${m.cd}" data-cm="${m.cm}" style="cursor:pointer">
+             <td>${m.nombre}</td><td>${m.depNombre}</td>
+           </tr>`
+        ).join('');
+        munSearchResults.innerHTML = `
+          <table><thead><tr><th>Municipio</th><th>Departamento</th></tr></thead>
+          <tbody>${rowsHtml}</tbody></table>`;
+        munSearchResults.querySelectorAll('tbody tr').forEach(tr => {
+          tr.addEventListener('click', () => {
+            const cd = tr.dataset.cd, cm = tr.dataset.cm;
+            munDepSelect.value = cd;
+            populateMunicipios(cd);
+            munSelect.value = cm;
+            munSearch.value = '';
+            renderMunicipio(cd, cm);
+          });
+        });
+      }
+      munSearchResults.style.display = 'block';
+      munDetail.style.display = 'none';
+    }, 150);
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (tooltip.classList.contains('show')) moveTooltip(e);
+  });
+})();
+</script>
+</body>
+</html>
