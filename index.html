@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Visualizador Electoral — Presidenciales Colombia 2026</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <style>
   :root {
     color-scheme: light;
@@ -287,6 +289,33 @@
     padding: 24px 0;
     text-align: center;
   }
+
+  .map-card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-bottom: 22px;
+  }
+  .map-card h3 { margin: 0 0 4px; font-size: 0.95rem; }
+  .map-container {
+    height: 440px;
+    border-radius: 8px;
+    background: var(--page-plane);
+    margin-top: 4px;
+  }
+  .map-container .leaflet-container { background: var(--page-plane); }
+  .map-empty-note {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    height: 440px;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    text-align: center;
+    background: var(--page-plane);
+    border-radius: 8px;
+  }
 </style>
 </head>
 <body>
@@ -339,6 +368,13 @@
     <div class="controls">
       <select id="dep-select"></select>
     </div>
+    <div class="map-card">
+      <h3>Mapa por departamento</h3>
+      <p class="chart-sub">Color según el candidato más votado en cada departamento. Clic en un departamento para seleccionarlo.</p>
+      <div id="dep-map" class="map-container"></div>
+      <div id="dep-map-empty" class="map-empty-note">Sin mapa disponible para esta circunscripción (voto en el exterior).</div>
+      <div class="legend" id="dep-map-legend"></div>
+    </div>
     <div class="stat-row" id="dep-stats"></div>
     <div class="chart-card">
       <h3 id="dep-chart-title">Resultados por candidato</h3>
@@ -369,6 +405,13 @@
     </div>
     <div id="mun-search-results" class="table-wrap" style="display:none; margin-bottom: 18px;"></div>
     <div id="mun-detail">
+      <div class="map-card">
+        <h3>Mapa por municipio</h3>
+        <p class="chart-sub">Color según el candidato más votado en cada municipio. Clic en un municipio para seleccionarlo.</p>
+        <div id="mun-map" class="map-container"></div>
+        <div id="mun-map-empty" class="map-empty-note">Sin mapa disponible para este municipio (límite no incluido en la cartografía de referencia).</div>
+        <div class="legend" id="mun-map-legend"></div>
+      </div>
       <div class="stat-row" id="mun-stats"></div>
       <div class="chart-card">
         <h3 id="mun-chart-title">Resultados por candidato</h3>
@@ -407,12 +450,19 @@
 </div>
 <div class="tooltip" id="tooltip"></div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
 (async function () {
   const seriesColors = [
     'var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)',
     'var(--series-5)', 'var(--series-6)', 'var(--series-7)', 'var(--series-8)'
   ];
+
+  // Declarados por adelantado (con valor inicial) para evitar errores de "temporal dead
+  // zone" si el usuario cambia de pestaña antes de que terminen de cargar los datos/mapas.
+  let depLeafletMap = null, munLeafletMap = null;
+  let depMapFitted = false, munMapFitted = false;
 
   // ---------- Tema ----------
   const themeBtn = document.getElementById('theme-toggle');
@@ -431,6 +481,8 @@
       if (next) localStorage.setItem('electoral2026-theme', next);
       else localStorage.removeItem('electoral2026-theme');
     } catch (e) {}
+    if (typeof redrawDepMapColors === 'function') redrawDepMapColors();
+    if (typeof redrawMunMapColors === 'function') redrawMunMapColors();
   });
 
   // ---------- Tabs ----------
@@ -440,6 +492,20 @@
       document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+      // Los mapas de Leaflet se inicializan en pestañas ocultas (display:none);
+      // hay que recalcular su tamaño al hacerlas visibles o quedan en blanco.
+      if (btn.dataset.tab === 'departamental' && depLeafletMap) {
+        setTimeout(() => {
+          depLeafletMap.invalidateSize();
+          if (!depMapFitted) { depLeafletMap.fitBounds(depGeoLayer.getBounds(), { padding: [8, 8] }); depMapFitted = true; }
+        }, 0);
+      }
+      if (btn.dataset.tab === 'municipal' && munLeafletMap) {
+        setTimeout(() => {
+          munLeafletMap.invalidateSize();
+          if (!munMapFitted) { zoomMunMapToDep(munDepSelect.value); munMapFitted = true; }
+        }, 0);
+      }
     });
   });
 
@@ -457,8 +523,14 @@
   function hideTooltip() { tooltip.classList.remove('show'); }
 
   // ---------- Carga de datos ----------
-  const resp = await fetch('data/resultados.json');
+  const [resp, depGeoResp, munGeoResp] = await Promise.all([
+    fetch('data/resultados.json'),
+    fetch('data/departamentos.geojson'),
+    fetch('data/municipios.geojson'),
+  ]);
   const data = await resp.json();
+  const depGeoJSON = await depGeoResp.json();
+  const munGeoJSON = await munGeoResp.json();
 
   document.getElementById('meta-generado').textContent =
     'Datos generados: ' + new Date(data.generado).toLocaleString('es-CO');
@@ -474,6 +546,20 @@
     if (meta.especial) return 'var(--especial)';
     if (meta.slot !== null && meta.slot !== undefined) return seriesColors[meta.slot];
     return 'var(--otros)';
+  }
+
+  // Resuelve un string tipo 'var(--series-1)' al color hex/rgb realmente calculado,
+  // necesario porque Leaflet fija los estilos de los paths como atributos SVG.
+  function resolveColor(varStr) {
+    const m = /^var\((--[\w-]+)\)$/.exec(varStr || '');
+    if (!m) return varStr;
+    return getComputedStyle(document.documentElement).getPropertyValue(m[1]).trim();
+  }
+
+  // Devuelve la fila del candidato más votado (o voto especial) en un objeto de votos.
+  function winnerOf(votosObj, total) {
+    const rows = buildRows(votosObj, total);
+    return rows[0] || null;
   }
 
   // Construye filas ordenadas {cod, nombre, partido, votos, pct, especial, slot}
@@ -590,6 +676,18 @@
     });
   }
 
+  // Leyenda de candidatos reutilizada en los mapas (mismo color = mismo candidato en todas las vistas)
+  function renderCandidateLegend(containerId) {
+    const container = document.getElementById(containerId);
+    const items = Object.keys(candidatos)
+      .map(cod => Object.assign({ cod }, candidatos[cod]))
+      .filter(c => !c.especial && c.slot !== null && c.slot !== undefined)
+      .sort((a, b) => a.slot - b.slot);
+    container.innerHTML = items.map(c =>
+      `<div class="legend-item"><span class="swatch" style="background:${colorFor(c.cod)}"></span>${c.nombre}</div>`
+    ).join('');
+  }
+
   // ================= NACIONAL =================
   (function initNacional() {
     const rows = buildRows(data.nacional.votos, data.nacional.total);
@@ -620,8 +718,76 @@
     renderChart('dep-chart', rows);
     renderTable('dep-table', rows);
     wireSortableTable('dep-table', rows, (sorted) => renderTable('dep-table', sorted));
+    updateDepMapSelection(cd);
   }
   depSelect.addEventListener('change', () => renderDepartamento(depSelect.value));
+
+  // ---------- Mapa departamental ----------
+  let depGeoLayer = null;
+  const depLayerByCod = {};
+
+  function styleForDepFeature(feature, selectedCod) {
+    const cod = feature.properties.cod_dep;
+    const dep = data.departamental[cod];
+    const w = dep ? winnerOf(dep.votos, dep.total) : null;
+    const isSelected = cod === selectedCod;
+    return {
+      fillColor: w ? resolveColor(colorFor(w.cod)) : resolveColor('var(--otros)'),
+      fillOpacity: 0.85,
+      weight: isSelected ? 3 : 1,
+      color: isSelected ? resolveColor('var(--text-primary)') : resolveColor('var(--surface-1)'),
+    };
+  }
+
+  function initDepMap() {
+    depLeafletMap = L.map('dep-map', {
+      attributionControl: false,
+      scrollWheelZoom: false,
+      zoomSnap: 0.25,
+    });
+    depGeoLayer = L.geoJSON(depGeoJSON, {
+      style: (f) => styleForDepFeature(f, depSelect.value),
+      onEachFeature: (feature, layer) => {
+        const cod = feature.properties.cod_dep;
+        depLayerByCod[cod] = layer;
+        layer.on('click', () => { depSelect.value = cod; renderDepartamento(cod); });
+        layer.on('mousemove', (e) => {
+          const dep = data.departamental[cod];
+          const w = dep ? winnerOf(dep.votos, dep.total) : null;
+          if (!dep || !w) return;
+          showTooltip(e.originalEvent, `<strong>${dep.nombre}</strong><br>${w.nombre} — ${fmtPct(w.pct)}`);
+        });
+        layer.on('mouseleave', hideTooltip);
+      },
+    }).addTo(depLeafletMap);
+    depLeafletMap.fitBounds(depGeoLayer.getBounds(), { padding: [8, 8] });
+  }
+
+  function updateDepMapSelection(cod) {
+    const mapEl = document.getElementById('dep-map');
+    const emptyEl = document.getElementById('dep-map-empty');
+    if (!depLayerByCod[cod]) {
+      mapEl.style.display = 'none';
+      emptyEl.style.display = 'flex';
+      return;
+    }
+    mapEl.style.display = 'block';
+    emptyEl.style.display = 'none';
+    if (depLeafletMap) depLeafletMap.invalidateSize();
+    depGeoLayer.eachLayer((layer) => {
+      layer.setStyle(styleForDepFeature(layer.feature, cod));
+    });
+    const target = depLayerByCod[cod];
+    target.bringToFront();
+  }
+
+  function redrawDepMapColors() {
+    if (!depGeoLayer) return;
+    depGeoLayer.eachLayer((layer) => layer.setStyle(styleForDepFeature(layer.feature, depSelect.value)));
+  }
+
+  initDepMap();
+  renderCandidateLegend('dep-map-legend');
   if (depCodes.length) { depSelect.value = depCodes[0]; renderDepartamento(depCodes[0]); }
 
   // ================= MUNICIPAL =================
@@ -663,6 +829,88 @@
     renderChart('mun-chart', rows);
     renderTable('mun-table', rows);
     wireSortableTable('mun-table', rows, (sorted) => renderTable('mun-table', sorted));
+    updateMunMapSelection(cd, cm);
+  }
+
+  // ---------- Mapa municipal ----------
+  let munGeoLayer = null;
+  const munLayerByKey = {};
+  const munKey = (cd, cm) => cd + ':' + cm;
+
+  function styleForMunFeature(feature, selectedKey) {
+    const p = feature.properties;
+    const muns = data.municipal[p.cod_dep] || {};
+    const mun = muns[p.cod_mun];
+    const w = mun ? winnerOf(mun.votos, mun.total) : null;
+    const isSelected = munKey(p.cod_dep, p.cod_mun) === selectedKey;
+    return {
+      fillColor: w ? resolveColor(colorFor(w.cod)) : resolveColor('var(--otros)'),
+      fillOpacity: 0.85,
+      weight: isSelected ? 2.5 : 0.4,
+      color: isSelected ? resolveColor('var(--text-primary)') : resolveColor('var(--surface-1)'),
+    };
+  }
+
+  function initMunMap() {
+    munLeafletMap = L.map('mun-map', {
+      attributionControl: false,
+      scrollWheelZoom: false,
+      zoomSnap: 0.25,
+      renderer: L.canvas(),
+    });
+    munGeoLayer = L.geoJSON(munGeoJSON, {
+      style: (f) => styleForMunFeature(f, munKey(munDepSelect.value, munSelect.value)),
+      onEachFeature: (feature, layer) => {
+        const p = feature.properties;
+        munLayerByKey[munKey(p.cod_dep, p.cod_mun)] = layer;
+        layer.on('click', () => {
+          munDepSelect.value = p.cod_dep;
+          populateMunicipios(p.cod_dep);
+          munSelect.value = p.cod_mun;
+          renderMunicipio(p.cod_dep, p.cod_mun);
+        });
+        layer.on('mousemove', (e) => {
+          const muns = data.municipal[p.cod_dep] || {};
+          const mun = muns[p.cod_mun];
+          const w = mun ? winnerOf(mun.votos, mun.total) : null;
+          if (!mun || !w) return;
+          showTooltip(e.originalEvent,
+            `<strong>${mun.nombre}</strong> (${data.departamental[p.cod_dep].nombre})<br>${w.nombre} — ${fmtPct(w.pct)}`);
+        });
+        layer.on('mouseleave', hideTooltip);
+      },
+    }).addTo(munLeafletMap);
+    munLeafletMap.fitBounds(munGeoLayer.getBounds(), { padding: [8, 8] });
+  }
+
+  function updateMunMapSelection(cd, cm) {
+    const mapEl = document.getElementById('mun-map');
+    const emptyEl = document.getElementById('mun-map-empty');
+    const key = munKey(cd, cm);
+    const target = munLayerByKey[key];
+    if (!target) {
+      mapEl.style.display = 'none';
+      emptyEl.style.display = 'flex';
+      return;
+    }
+    mapEl.style.display = 'block';
+    emptyEl.style.display = 'none';
+    if (munLeafletMap) munLeafletMap.invalidateSize();
+    munGeoLayer.eachLayer((layer) => layer.setStyle(styleForMunFeature(layer.feature, key)));
+    target.bringToFront();
+    zoomMunMapToDep(cd);
+  }
+
+  function zoomMunMapToDep(cd) {
+    if (!munLeafletMap) return;
+    const layer = depLayerByCod[cd];
+    if (layer) munLeafletMap.fitBounds(layer.getBounds(), { padding: [16, 16], maxZoom: 10 });
+  }
+
+  function redrawMunMapColors() {
+    if (!munGeoLayer) return;
+    const key = munKey(munDepSelect.value, munSelect.value);
+    munGeoLayer.eachLayer((layer) => layer.setStyle(styleForMunFeature(layer.feature, key)));
   }
 
   munDepSelect.addEventListener('change', () => {
@@ -671,6 +919,8 @@
   });
   munSelect.addEventListener('change', () => renderMunicipio(munDepSelect.value, munSelect.value));
 
+  initMunMap();
+  renderCandidateLegend('mun-map-legend');
   if (depCodes.length) {
     munDepSelect.value = depCodes[0];
     const codes = populateMunicipios(depCodes[0]);
